@@ -33,6 +33,7 @@ func execute() error {
 	}
 
 	socket := flag.String("socket", "/tmp/"+app+".sock", "socket path")
+	continueOnError := flag.Bool("continue-on-error", false, "Do not stop the server on any error")
 	confirm := flag.Bool("confirm", false, "confirm password")
 	flag.Parse()
 
@@ -46,7 +47,7 @@ func execute() error {
 	case "set":
 		return setPassword(*socket, *confirm)
 	case "server":
-		return startServer(*socket)
+		return startServer(*socket, *continueOnError)
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -54,7 +55,7 @@ func execute() error {
 	return nil
 }
 
-func startServer(socketPath string) error {
+func startServer(socketPath string, continueOnError bool) error {
 	var g run.Group
 
 	// sigterm
@@ -70,6 +71,7 @@ func startServer(socketPath string) error {
 	// socket
 	socketServer := memguarded.Server{
 		SocketPath: socketPath,
+		AnyClientErrorCloseTheServer: !continueOnError,
 	}
 	if err := socketServer.Init(&passService); err != nil {
 		return err
