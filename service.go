@@ -15,7 +15,7 @@ import (
 )
 
 type Service struct {
-	password   *memguard.Enclave
+	secret     *memguard.Enclave
 	notify     map[chan struct{}]struct{}
 	notifyLock sync.RWMutex
 	stop       chan struct{}
@@ -44,60 +44,60 @@ func (s *Service) Start() error {
 	return nil
 }
 
-func (s *Service) FromBytes(password *[]byte) error {
-	defer memguard.WipeBytes(*password)
-	s.setAndNotify(memguard.NewBufferFromBytes(*password))
+func (s *Service) FromBytes(secret *[]byte) error {
+	defer memguard.WipeBytes(*secret)
+	s.setAndNotify(memguard.NewBufferFromBytes(*secret))
 	return nil
 }
 
 func (s *Service) FromConnection(conn net.Conn) error {
 	buffer, err := memguard.NewBufferFromReaderUntil(conn, '\n')
 	if err != nil && err != io.EOF {
-		return errs.WithE(err, "Failed to read password from connection")
+		return errs.WithE(err, "Failed to read secret from connection")
 	}
 	s.setAndNotify(buffer)
 	return nil
 }
 
-func (s *Service) AskPassword(confirmation bool) error {
+func (s *Service) AskSecret(confirmation bool) error {
 	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
-		return errs.With("Cannot ask password, not in a terminal")
+		return errs.With("Cannot ask secret, not in a terminal")
 	}
 	return s.FromStdin(confirmation)
 }
 
 func (s *Service) FromStdin(confirmation bool) error {
-	var password, passwordConfirm []byte
-	defer memguard.WipeBytes(password)
-	defer memguard.WipeBytes(passwordConfirm)
+	var secret, secretConfirm []byte
+	defer memguard.WipeBytes(secret)
+	defer memguard.WipeBytes(secretConfirm)
 
 	for {
 		var err error
 
-		print("Password: ")
-		password, err = terminal.ReadPassword(int(syscall.Stdin))
+		print("Secret: ")
+		secret, err = terminal.ReadPassword(syscall.Stdin)
 		if err != nil {
-			return errs.WithE(err, "Cannot read password")
+			return errs.WithE(err, "Cannot read secret")
 		}
 
 		print("\n")
 		if !confirmation {
-			s.setAndNotify(memguard.NewBufferFromBytes(password))
+			s.setAndNotify(memguard.NewBufferFromBytes(secret))
 			return nil
 		}
 
 		print("Confirm: ")
-		passwordConfirm, err = terminal.ReadPassword(int(syscall.Stdin))
+		secretConfirm, err = terminal.ReadPassword(syscall.Stdin)
 		if err != nil {
-			return errs.WithE(err, "Cannot read password")
+			return errs.WithE(err, "Cannot read secret")
 		}
 		print("\n")
 
-		if string(password) == string(passwordConfirm) && string(password) != "" {
-			s.setAndNotify(memguard.NewBufferFromBytes(password))
+		if string(secret) == string(secretConfirm) && string(secret) != "" {
+			s.setAndNotify(memguard.NewBufferFromBytes(secret))
 			return nil
 		} else {
-			fmt.Println("\nEmpty password or do not match...\n")
+			fmt.Println("\nEmpty secret or do not match...\n")
 		}
 	}
 }
@@ -122,13 +122,13 @@ func (s Service) Write(writer io.Writer) error {
 	var total, written int
 	var err error
 
-	if s.password == nil {
-		return errs.With("Password is not set")
+	if s.secret == nil {
+		return errs.With("Secret is not set")
 	}
 
-	lockedBuffer, err := s.password.Open()
+	lockedBuffer, err := s.secret.Open()
 	if err != nil {
-		return errs.WithE(err, "Failed to open password enclave")
+		return errs.WithE(err, "Failed to open secret enclave")
 	}
 	defer lockedBuffer.Destroy()
 
@@ -144,7 +144,7 @@ func (s Service) Write(writer io.Writer) error {
 }
 
 func (s Service) IsSet() bool {
-	if s.password != nil {
+	if s.secret != nil {
 		return true
 	}
 	return false
@@ -152,9 +152,9 @@ func (s Service) IsSet() bool {
 
 func (s Service) Get() (*memguard.LockedBuffer, error) {
 	if !s.IsSet() {
-		return nil, errs.With("No password set")
+		return nil, errs.With("No secret set")
 	}
-	return s.password.Open()
+	return s.secret.Open()
 }
 
 /////
@@ -163,8 +163,8 @@ func (s *Service) setAndNotify(buffer *memguard.LockedBuffer) {
 	s.notifyLock.RLock()
 	defer s.notifyLock.RUnlock()
 
-	logs.Debug("Password set")
-	s.password = buffer.Seal()
+	logs.Debug("Secret set")
+	s.secret = buffer.Seal()
 	for e := range s.notify {
 		e <- struct{}{}
 	}

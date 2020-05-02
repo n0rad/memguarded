@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"github.com/n0rad/go-erlog/data"
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
@@ -11,13 +10,15 @@ import (
 	"github.com/n0rad/memguarded"
 	"github.com/oklog/run"
 	"math/rand"
-	"net"
 	"os"
 	"path/filepath"
 	"time"
 )
 
 var Version = ""
+var SocketPath = "/tmp/" + app + ".sock"
+var SocketPassword = ""
+
 var app = filepath.Base(os.Args[0])
 
 func main() {
@@ -32,10 +33,28 @@ func execute() error {
 		return errs.WithF(data.WithField("commands", "get|set|server|version"), "command required")
 	}
 
-	socket := flag.String("socket", "/tmp/"+app+".sock", "socket path")
-	continueOnError := flag.Bool("continue-on-error", false, "Do not stop the server on any error")
-	confirm := flag.Bool("confirm", false, "confirm password")
-	flag.Parse()
+	flagger := flag.NewFlagSet("command", flag.ExitOnError)
+	socketPath := flagger.String("socket", "", "socket path")
+	socketPassword := flagger.String("password", "", "socket password")
+	confirm := flagger.Bool("confirm", false, "confirm password")
+	debug := flagger.Bool("debug", false, "debug")
+	continueOnError := flagger.Bool("continue-on-error", false, "Do not stop the server on any error")
+
+	if err := flagger.Parse(os.Args[2:]); err != nil {
+		return err
+	}
+
+	if *socketPassword == "" {
+		*socketPassword = SocketPassword
+	}
+
+	if *socketPath == "" {
+		*socketPath = SocketPath
+	}
+
+	if *debug {
+		logs.SetLevel(logs.TRACE)
+	}
 
 	switch os.Args[1] {
 	case "version":
@@ -43,11 +62,11 @@ func execute() error {
 		fmt.Println("version : ", Version)
 		return nil
 	case "get":
-		return getPassword(*socket)
+		return getSecret(*socketPath, *socketPassword)
 	case "set":
-		return setPassword(*socket, *confirm)
+		return setSecret(*socketPath, *socketPassword, *confirm)
 	case "server":
-		return startServer(*socket, *continueOnError)
+		return startServer(*socketPath, *socketPassword, *continueOnError)
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -55,7 +74,7 @@ func execute() error {
 	return nil
 }
 
-func startServer(socketPath string, continueOnError bool) error {
+func startServer(socketPath string, socketPassword string, continueOnError bool) error {
 	var g run.Group
 
 	// sigterm
@@ -70,7 +89,7 @@ func startServer(socketPath string, continueOnError bool) error {
 
 	// socket
 	socketServer := memguarded.Server{
-		SocketPath: socketPath,
+		SocketPath:                   socketPath,
 		AnyClientErrorCloseTheServer: !continueOnError,
 	}
 	if err := socketServer.Init(&passService); err != nil {
@@ -88,80 +107,48 @@ func startServer(socketPath string, continueOnError bool) error {
 	return nil
 }
 
+func getSecret(socketPath string, socketPassword string) error {
+	secretService := memguarded.Service{}
+	secretService.Init()
+	go secretService.Start()
+	defer secretService.Stop(nil)
 
-func getPassword(socketPath string) error {
-	passService := memguarded.Service{}
-	passService.Init()
-	go passService.Start()
-	defer passService.Stop(nil)
-
-	// connect
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return errs.WithEF(err, data.WithField("socketPath", socketPath), "Failed to connect to socketPath")
+	client := memguarded.Client{
+		SocketPath:     socketPath,
+		SocketPassword: socketPassword,
 	}
-	defer conn.Close()
-
-	if err := conn.SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
-		return errs.WithE(err, "Failed to set deadline")
+	if err := client.Connect(); err != nil {
+		return err
 	}
 
-	if err := memguarded.WriteBytes(conn, []byte("get_password\n")); err != nil {
-		return errs.WithE(err, "Failed to write command")
+	if err := client.GetSecret(&secretService); err != nil {
+		return err
 	}
 
-	if err := passService.FromConnection(conn); err != nil {
-		return errs.WithE(err, "Failed to get password")
-	}
-
-	if err := passService.Write(os.Stdout); err != nil {
+	if err := secretService.Write(os.Stdout); err != nil {
 		return errs.WithE(err, "Failed to write password to stdin")
 	}
 
 	return nil
 }
 
-func setPassword(socketPath string, confirm bool) error {
-	passService := memguarded.Service{}
-	passService.Init()
-	go passService.Start()
-	defer passService.Stop(nil)
+func setSecret(socketPath string, socketPassword string, confirm bool) error {
+	secretService := memguarded.Service{}
+	secretService.Init()
+	go secretService.Start()
+	defer secretService.Stop(nil)
 
-	if err := passService.FromStdin(confirm); err != nil {
+	if err := secretService.FromStdin(confirm); err != nil {
 		return errs.WithE(err, "Failed to ask password")
 	}
 
-	// connect
-	conn, err := net.Dial("unix", socketPath)
-	if err != nil {
-		return errs.WithEF(err, data.WithField("socketPath", socketPath), "Failed to connect to socketPath")
+	client := memguarded.Client{
+		SocketPath:     socketPath,
+		SocketPassword: socketPassword,
 	}
-	defer conn.Close()
-
-	if err := conn.SetDeadline(time.Now().Add(1 * time.Second)); err != nil {
-		return errs.WithE(err, "Failed to set deadline")
-	}
-
-	if err := memguarded.WriteBytes(conn, []byte("set_password ")); err != nil {
-		return errs.WithE(err, "Failed to write command")
-	}
-
-	if err := passService.Write(conn); err != nil {
-		return errs.WithE(err, "Failed to write key")
-	}
-
-	if err := memguarded.WriteBytes(conn, []byte{'\n'}); err != nil {
+	if err := client.Connect(); err != nil {
 		return err
 	}
 
-	return nil
+	return client.SetSecret(&secretService)
 }
-
-func homeDotConfigPath() (string, error) {
-	home, err := homedir.Dir()
-	if err != nil {
-		return "", errs.WithE(err, "Failed to find user home folder")
-	}
-	return home + "/.config", nil
-}
-
