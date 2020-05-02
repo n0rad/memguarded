@@ -59,14 +59,14 @@ func (s *Service) FromConnection(conn net.Conn) error {
 	return nil
 }
 
-func (s *Service) AskSecret(confirmation bool) error {
+func (s *Service) AskSecret(confirmation bool, name string) error {
 	if !terminal.IsTerminal(int(os.Stdout.Fd())) {
 		return errs.With("Cannot ask secret, not in a terminal")
 	}
-	return s.FromStdin(confirmation)
+	return s.FromStdin(confirmation, name)
 }
 
-func (s *Service) FromStdin(confirmation bool) error {
+func (s *Service) FromStdin(confirmation bool, name string) error {
 	var secret, secretConfirm []byte
 	defer memguard.WipeBytes(secret)
 	defer memguard.WipeBytes(secretConfirm)
@@ -74,7 +74,7 @@ func (s *Service) FromStdin(confirmation bool) error {
 	for {
 		var err error
 
-		print("Secret: ")
+		print(name + ": ")
 		secret, err = terminal.ReadPassword(syscall.Stdin)
 		if err != nil {
 			return errs.WithE(err, "Cannot read secret")

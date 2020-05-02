@@ -9,7 +9,7 @@ import (
 
 type Client struct {
 	SocketPath     string
-	SocketPassword string
+	SocketPassword *Service
 
 	conn *net.Conn
 }
@@ -25,18 +25,16 @@ func (c *Client) Connect() error {
 		return errs.WithE(err, "Failed to set deadline")
 	}
 
-	if c.SocketPassword != "" {
-		if err := WriteBytes(*c.conn, []byte("socket_password ")); err != nil {
-			return errs.WithE(err, "Failed to write command")
-		}
+	if err := WriteBytes(*c.conn, []byte("socket_password ")); err != nil {
+		return errs.WithE(err, "Failed to write command")
+	}
 
-		if err := WriteBytes(*c.conn, []byte(c.SocketPassword)); err != nil {
-			return errs.WithE(err, "Failed to write socket secret")
-		}
+	if err := c.SocketPassword.Write(*c.conn); err != nil {
+		return errs.WithE(err, "Failed to write socket secret")
+	}
 
-		if err := WriteBytes(*c.conn, []byte{'\n'}); err != nil {
-			return err
-		}
+	if err := WriteBytes(*c.conn, []byte{'\n'}); err != nil {
+		return err
 	}
 	return nil
 }

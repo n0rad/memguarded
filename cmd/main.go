@@ -17,7 +17,6 @@ import (
 
 var Version = ""
 var SocketPath = "/tmp/" + app + ".sock"
-var SocketPassword = "ccc"
 
 var app = filepath.Base(os.Args[0])
 
@@ -33,19 +32,14 @@ func execute() error {
 		return errs.WithF(data.WithField("commands", "get|set|server|version"), "command required")
 	}
 
-	flagger := flag.NewFlagSet("command", flag.ExitOnError)
-	socketPath := flagger.String("socket", "", "socket path")
-	socketPassword := flagger.String("password", "", "socket password")
-	confirm := flagger.Bool("confirm", false, "confirm password")
-	debug := flagger.Bool("debug", false, "debug")
-	continueOnError := flagger.Bool("continue-on-error", false, "Do not stop the server on any error")
+	flags := flag.NewFlagSet("command", flag.ExitOnError)
+	socketPath := flags.String("socket", "", "socket path")
+	confirm := flags.Bool("confirm", false, "confirm password")
+	debug := flags.Bool("debug", false, "debug")
+	continueOnError := flags.Bool("continue-on-error", false, "Do not stop the server on any error")
 
-	if err := flagger.Parse(os.Args[2:]); err != nil {
+	if err := flags.Parse(os.Args[2:]); err != nil {
 		return err
-	}
-
-	if *socketPassword == "" {
-		*socketPassword = SocketPassword
 	}
 
 	if *socketPath == "" {
@@ -56,17 +50,30 @@ func execute() error {
 		logs.SetLevel(logs.TRACE)
 	}
 
-	switch os.Args[1] {
-	case "version":
+	if os.Args[1] == "version" {
 		fmt.Println(app)
 		fmt.Println("version : ", Version)
 		return nil
+	}
+
+	// socket password
+	socketPassword := &memguarded.Service{}
+	socketPassword.Init()
+	go socketPassword.Start()
+	defer socketPassword.Stop(nil)
+
+	if err := socketPassword.AskSecret(false, "Socket password"); err != nil {
+		return errs.WithE(err, "Failed ask socket password")
+	}
+
+	switch os.Args[1] {
+	case "version":
 	case "get":
-		return getSecret(*socketPath, *socketPassword)
+		return getSecret(*socketPath, socketPassword)
 	case "set":
-		return setSecret(*socketPath, *socketPassword, *confirm)
+		return setSecret(*socketPath, socketPassword, *confirm)
 	case "server":
-		return startServer(*socketPath, *socketPassword, *continueOnError)
+		return startServer(*socketPath, socketPassword, *continueOnError)
 	default:
 		flag.PrintDefaults()
 		os.Exit(1)
@@ -74,7 +81,7 @@ func execute() error {
 	return nil
 }
 
-func startServer(socketPath string, socketPassword string, continueOnError bool) error {
+func startServer(socketPath string, socketPassword *memguarded.Service, continueOnError bool) error {
 	var g run.Group
 
 	// sigterm
@@ -82,18 +89,18 @@ func startServer(socketPath string, socketPassword string, continueOnError bool)
 	sigterm.Init()
 	g.Add(sigterm.Start, sigterm.Stop)
 
-	// password
-	passService := memguarded.Service{}
-	passService.Init()
-	g.Add(passService.Start, passService.Stop)
+	// secret
+	secretService := memguarded.Service{}
+	secretService.Init()
+	g.Add(secretService.Start, secretService.Stop)
 
 	// socket
 	socketServer := memguarded.Server{
 		SocketPath:                   socketPath,
-		SocketPassword:               socketPassword,
 		AnyClientErrorCloseTheServer: !continueOnError,
 	}
-	if err := socketServer.Init(&passService); err != nil {
+
+	if err := socketServer.Init(&secretService, socketPassword); err != nil {
 		return err
 	}
 	g.Add(socketServer.Start, socketServer.Stop)
@@ -108,7 +115,7 @@ func startServer(socketPath string, socketPassword string, continueOnError bool)
 	return nil
 }
 
-func getSecret(socketPath string, socketPassword string) error {
+func getSecret(socketPath string, socketPassword *memguarded.Service) error {
 	secretService := memguarded.Service{}
 	secretService.Init()
 	go secretService.Start()
@@ -133,13 +140,13 @@ func getSecret(socketPath string, socketPassword string) error {
 	return nil
 }
 
-func setSecret(socketPath string, socketPassword string, confirm bool) error {
+func setSecret(socketPath string, socketPassword *memguarded.Service, confirm bool) error {
 	secretService := memguarded.Service{}
 	secretService.Init()
 	go secretService.Start()
 	defer secretService.Stop(nil)
 
-	if err := secretService.FromStdin(confirm); err != nil {
+	if err := secretService.FromStdin(confirm, "Secret"); err != nil {
 		return errs.WithE(err, "Failed to ask password")
 	}
 

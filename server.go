@@ -18,7 +18,6 @@ import (
 type Server struct {
 	Timeout                      time.Duration
 	SocketPath                   string
-	SocketPassword               string
 	AnyClientErrorCloseTheServer bool
 
 	userUid  uint32
@@ -32,10 +31,7 @@ type metaConnection struct {
 	passSet bool
 }
 
-func (s *Server) Init(secretService *Service) error {
-	if s.SocketPath == "" {
-		return errs.With("socket path must be set")
-	}
+func (s *Server) Init(secretService *Service, socketPassword *Service) error {
 	s.Timeout = 10 * time.Second
 	s.commands = make(map[string]func(*metaConnection) error)
 
@@ -46,9 +42,14 @@ func (s *Server) Init(secretService *Service) error {
 			return errs.WithE(err, "Failed to read socket secret from connection")
 		}
 
-		if buffer.EqualTo([]byte(s.SocketPassword)) {
+		get, err := socketPassword.Get()
+		if err != nil {
+			return errs.WithE(err, "Failed to get current socket password")
+		}
+		if get.EqualTo(buffer.Bytes()) {
 			m.passSet = true
 		} else {
+			time.Sleep(5 * time.Second)
 			return errs.With("set wrong socket password")
 		}
 		return nil
@@ -56,7 +57,7 @@ func (s *Server) Init(secretService *Service) error {
 
 	s.commands["set_secret"] = func(m *metaConnection) error {
 		logs.Info("Set secret")
-		if s.SocketPassword != "" && !m.passSet {
+		if !m.passSet {
 			return errs.With("socket secret not set, cannot perform command")
 		}
 		if err := secretService.FromConnection(m.conn); err != nil {
@@ -66,7 +67,7 @@ func (s *Server) Init(secretService *Service) error {
 	}
 	s.commands["get_secret"] = func(m *metaConnection) error {
 		logs.Info("Get secret")
-		if s.SocketPassword != "" && !m.passSet {
+		if !m.passSet {
 			return errs.With("socket secret not set, cannot perform command")
 		}
 		err := secretService.Write(m.conn)
@@ -125,7 +126,8 @@ func (s *Server) Start() error {
 			return errs.WithF(data.WithField("socket", s.SocketPath).WithField("mode", socketStat.Mode()).WithField("xx", os.FileMode(0700)), "Socket mod changed")
 		}
 
-		go s.handleConnection(conn)
+		//go s.handleConnection(conn)
+		s.handleConnection(conn) // we don't need a high throughput server
 	}
 }
 
