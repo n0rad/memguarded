@@ -51,17 +51,29 @@ func (s *Server) Init(passService *Service) error {
 func (s *Server) Start() error {
 	s.cleanupSocket()
 	s.stop = make(chan struct{}, 1)
-	defer close(s.stop)
 
 	listener, err := net.Listen("unix", s.SocketPath)
 	if err != nil {
 		return errs.WithEF(err, data.WithField("path", s.SocketPath), "Failed to listen on socket")
 	}
+	if err := os.Chmod(s.SocketPath, os.ModeSocket|0700); err != nil {
+		return errs.WithEF(err, data.WithField("socket", s.SocketPath), "Failed to set socket permissions")
+	}
+
 	s.listener = listener
 	defer s.cleanupSocket()
 
 	for {
 		conn, err := s.listener.Accept()
+
+		socketStat, err := os.Stat(s.SocketPath)
+		if err != nil {
+			return errs.WithEF(err, data.WithField("socket", s.SocketPath), "Failed to get socket stats")
+		}
+		if socketStat.Mode() != os.ModeSocket|0700 {
+			return errs.WithF(data.WithField("socket", s.SocketPath).WithField("mode", socketStat.Mode()).WithField("xx", os.FileMode(0700)), "Socket mod changed")
+		}
+
 		if err != nil {
 			select {
 			case <-s.stop:
