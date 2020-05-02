@@ -40,7 +40,7 @@ func (s *Server) Init(secretService *Service) error {
 	s.commands = make(map[string]func(*metaConnection) error)
 
 	s.commands["socket_password"] = func(m *metaConnection) error {
-		logs.WithField("conn", m.conn).Debug("Set socket password")
+		logs.Debug("Set socket password")
 		buffer, err := memguard.NewBufferFromReaderUntil(m.conn, '\n')
 		if err != nil {
 			return errs.WithE(err, "Failed to read socket secret from connection")
@@ -48,12 +48,14 @@ func (s *Server) Init(secretService *Service) error {
 
 		if buffer.EqualTo([]byte(s.SocketPassword)) {
 			m.passSet = true
+		} else {
+			return errs.With("set wrong socket password")
 		}
 		return nil
 	}
 
 	s.commands["set_secret"] = func(m *metaConnection) error {
-		logs.WithField("conn", m.conn).Info("Set secret")
+		logs.Info("Set secret")
 		if s.SocketPassword != "" && !m.passSet {
 			return errs.With("socket secret not set, cannot perform command")
 		}
@@ -63,7 +65,7 @@ func (s *Server) Init(secretService *Service) error {
 		return nil
 	}
 	s.commands["get_secret"] = func(m *metaConnection) error {
-		logs.WithField("conn", m.conn).Info("Get secret")
+		logs.Info("Get secret")
 		if s.SocketPassword != "" && !m.passSet {
 			return errs.With("socket secret not set, cannot perform command")
 		}

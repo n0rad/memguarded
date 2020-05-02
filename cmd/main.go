@@ -17,7 +17,7 @@ import (
 
 var Version = ""
 var SocketPath = "/tmp/" + app + ".sock"
-var SocketPassword = ""
+var SocketPassword = "ccc"
 
 var app = filepath.Base(os.Args[0])
 
@@ -90,6 +90,7 @@ func startServer(socketPath string, socketPassword string, continueOnError bool)
 	// socket
 	socketServer := memguarded.Server{
 		SocketPath:                   socketPath,
+		SocketPassword:               socketPassword,
 		AnyClientErrorCloseTheServer: !continueOnError,
 	}
 	if err := socketServer.Init(&passService); err != nil {
