@@ -10,7 +10,6 @@ import (
 	_ "github.com/n0rad/go-erlog/register"
 	"github.com/n0rad/memguarded"
 	"github.com/oklog/run"
-	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -29,8 +28,6 @@ func main() {
 }
 
 func execute() error {
-	//getCommand := flag.NewFlagSet("get", flag.ExitOnError)
-
 	if len(os.Args) < 2 {
 		return errs.WithF(data.WithField("commands", "get|set|server|version"), "command required")
 	}
@@ -107,7 +104,7 @@ func getPassword(socketPath string) error {
 		return errs.WithE(err, "Failed to set deadline")
 	}
 
-	if err := writeBytes(conn, []byte("get_password\n")); err != nil {
+	if err := memguarded.WriteBytes(conn, []byte("get_password\n")); err != nil {
 		return errs.WithE(err, "Failed to write command")
 	}
 
@@ -143,7 +140,7 @@ func setPassword(socketPath string, confirm bool) error {
 		return errs.WithE(err, "Failed to set deadline")
 	}
 
-	if err := writeBytes(conn, []byte("set_password ")); err != nil {
+	if err := memguarded.WriteBytes(conn, []byte("set_password ")); err != nil {
 		return errs.WithE(err, "Failed to write command")
 	}
 
@@ -151,22 +148,10 @@ func setPassword(socketPath string, confirm bool) error {
 		return errs.WithE(err, "Failed to write key")
 	}
 
-	if _, err := conn.Write([]byte{'\n'}); err != nil {
+	if err := memguarded.WriteBytes(conn, []byte{'\n'}); err != nil {
 		return err
 	}
 
-	return nil
-}
-
-func writeBytes(conn io.Writer, bytes []byte) error {
-	var total, written int
-	var err error
-	for total = 0; total < len(bytes); total += written {
-		written, err = conn.Write(bytes[total:])
-		if err != nil {
-			return err
-		}
-	}
 	return nil
 }
 

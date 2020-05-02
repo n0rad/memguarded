@@ -5,9 +5,13 @@ import (
 	"github.com/n0rad/go-erlog/data"
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
+	"golang.org/x/sys/unix"
 	"io"
+	"log"
 	"net"
 	"os"
+	"os/user"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -38,10 +42,7 @@ func (s *Server) Init(passService *Service) error {
 		if err != nil {
 			return err
 		}
-		if _, err := conn.Write([]byte{'\n'}); err != nil {
-			return err
-		}
-		return err
+		return WriteBytes(conn, []byte{'\n'})
 	}
 
 	return nil
@@ -101,6 +102,32 @@ func (s *Server) handleConnection(conn net.Conn) {
 		}
 	}()
 
+	creds, err := readCreds(conn)
+	if err != nil {
+		logs.WithE(err).Warn("Failed to read client credentials")
+		return
+	}
+
+	// TODO
+	uidStr, err := user.Current()
+	if err != nil {
+
+		log.Fatal(err)
+	}
+
+	uid, err := strconv.Atoi(uidStr.Uid)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+
+	if creds.Uid != uint32(uid) {
+		logs.WithField("uid", creds.Uid).Error("Unauthorized access")
+		//client.Write([]byte("Unauthorized access\n"))
+		//client.Close()
+		return
+	}
+
 	for {
 		if err := conn.SetDeadline(time.Now().Add(s.Timeout)); err != nil {
 			logs.WithEF(err, data.WithField("timeout", s.Timeout)).Warn("Failed to set deadline on socket connection")
@@ -146,4 +173,53 @@ func readCommand(conn net.Conn) (string, error) {
 		}
 		command += string(buffer)
 	}
+}
+
+func WriteBytes(conn io.Writer, bytes []byte) error {
+	var total, written int
+	var err error
+	for total = 0; total < len(bytes); total += written {
+		written, err = conn.Write(bytes[total:])
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func readCreds(c net.Conn) (*unix.Ucred, error) {
+
+	var cred *unix.Ucred
+
+	// net.Conn is an interface. Expect only *net.UnixConn types
+	uc, ok := c.(*net.UnixConn)
+	if !ok {
+		return nil, fmt.Errorf("unexpected socket type")
+	}
+
+	// Fetches raw network connection from UnixConn
+	raw, err := uc.SyscallConn()
+	if err != nil {
+		return nil, fmt.Errorf("error opening raw connection: %s", err)
+	}
+
+	// The raw.Control() callback does not return an error directly.
+	// In order to capture errors, we wrap already defined variable
+	// 'err' within the closure. 'err2' is then the error returned
+	// by Control() itself.
+	err2 := raw.Control(func(fd uintptr) {
+		cred, err = unix.GetsockoptUcred(int(fd),
+			unix.SOL_SOCKET,
+			unix.SO_PEERCRED)
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("GetsockoptUcred() error: %s", err)
+	}
+
+	if err2 != nil {
+		return nil, fmt.Errorf("Control() error: %s", err2)
+	}
+
+	return cred, nil
 }
