@@ -19,14 +19,19 @@ type StepBuild struct {
 	OsArch     string
 	UseVendor  *bool
 	Version    string
-	//Upx           bool
+	Package    string
+	Upx        bool
+
+	project     *Project
+	packageName string
 }
 
 func (c *StepBuild) Name() string {
 	return "build"
 }
 
-func (c *StepBuild) Init() error {
+func (c *StepBuild) Init(project *Project) error {
+	c.project = project
 	if c.BinaryName == "" {
 		wd, err := os.Getwd()
 		if err != nil {
@@ -37,6 +42,10 @@ func (c *StepBuild) Init() error {
 
 	if len(c.OsArch) == 0 {
 		c.OsArch = runtime.GOOS + "-" + runtime.GOARCH
+	}
+
+	if c.Package == "" {
+		c.Package = "./"
 	}
 
 	if c.UseVendor == nil {
@@ -86,10 +95,43 @@ func (c *StepBuild) GetCommand() *cobra.Command {
 				buildArgs = append(buildArgs, "-mod", "vendor")
 			}
 			buildArgs = append(buildArgs, "-ldflags", "-s -w -X main.Version="+c.Version)
-			buildArgs = append(buildArgs, "-o", "dist/"+c.BinaryName+"-"+c.OsArch+"/"+c.BinaryName)
 
-			return Exec("go", buildArgs...)
+			packageName, err := ExecGetStdout("go", "list", "-f", "{{.Name}}", c.Package)
+			if err != nil {
+				return errs.WithE(err, "Failed to get package name")
+			}
+			if packageName == "main" {
+				buildArgs = append(buildArgs, "-o", "dist/"+c.BinaryName+"-"+c.OsArch+"/"+c.BinaryName)
+			}
+
+			if c.Package != "" {
+				buildArgs = append(buildArgs, c.Package)
+			}
+
+			if err := Exec("go", buildArgs...); err != nil {
+				return errs.WithE(err, "go build failed")
+			}
+
+			if c.Upx && packageName != "main" {
+				return errs.With("Cannot upx a library package")
+			}
+			if c.Upx {
+				if std, err := ExecGetStd("which", "upx"); err != nil {
+					return errs.WithEF(err, data.WithField("std", std), "upx binary not in path")
+				}
+
+				if err := Exec("upx", "--ultra-brute", "dist/"+c.BinaryName+"-"+c.OsArch+"/"+c.BinaryName); err != nil {
+					return errs.WithE(err, "upx failed")
+				}
+			}
+
+			return nil
 		}),
 	}
+
+	//cmd.AddCommand(c.project.MustGetCommand("test"))
+	//cmd.AddCommand(c.project.MustGetCommand("check"))
+	//cmd.AddCommand(c.project.MustGetCommand("release"))
+
 	return cmd
 }

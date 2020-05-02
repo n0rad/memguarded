@@ -155,7 +155,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		logs.WithE(err).Error("Client connection handle failed")
 	}
 
-	if s.AnyClientErrorCloseTheServer {
+	if err != nil && s.AnyClientErrorCloseTheServer {
 		s.Stop(err)
 	}
 }

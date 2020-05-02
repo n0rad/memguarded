@@ -1,7 +1,5 @@
 module github.com/n0rad/go-erlog
 
-go 1.14
-
 require (
 	github.com/mgutz/ansi v0.0.0-20150914162238-c286dcecd19f
 	github.com/onsi/gomega v1.4.2

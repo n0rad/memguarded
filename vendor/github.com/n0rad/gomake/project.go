@@ -5,6 +5,7 @@ import (
 	"github.com/n0rad/go-erlog/logs"
 	_ "github.com/n0rad/go-erlog/register"
 	"github.com/spf13/cobra"
+	"os"
 	"time"
 )
 
@@ -19,7 +20,9 @@ func commandDurationWrapper(f func(cmd *cobra.Command, args []string) error) fun
 }
 
 type Project struct {
-	steps map[string]Step
+	args         []string
+	steps        map[string]Step
+	commandCache map[string]*cobra.Command
 }
 
 func NewProject() *Project {
@@ -28,15 +31,30 @@ func NewProject() *Project {
 	return &p
 }
 
+func (p *Project) MustGetCommand(name string) *cobra.Command {
+	cmd, ok := p.commandCache[name]
+	if !ok {
+		step, ok := p.steps[name]
+		if !ok {
+			logs.WithField("step", name).Fatal("Cannot found step")
+		}
+		cmd = step.GetCommand()
+		p.commandCache[name] = cmd
+	}
+	return cmd
+}
+
 func (p *Project) Init() error {
+	p.commandCache = make(map[string]*cobra.Command)
+
 	if _, ok := p.steps["clean"]; !ok {
 		p.steps["clean"] = &StepClean{}
 	}
 	if _, ok := p.steps["build"]; !ok {
 		p.steps["build"] = &StepBuild{}
 	}
-	if _, ok := p.steps["quality"]; !ok {
-		p.steps["quality"] = &StepCheck{}
+	if _, ok := p.steps["check"]; !ok {
+		p.steps["check"] = &StepCheck{}
 	}
 	if _, ok := p.steps["test"]; !ok {
 		p.steps["test"] = &StepTest{}
@@ -45,8 +63,15 @@ func (p *Project) Init() error {
 	//	p.steps["release"] = &StepRelease{}
 	//}
 
+	if len(p.args) == 0 {
+		p.args = os.Args[1:]
+	}
+	//if len(p.args) == 0 {
+	//	p.args = []string{"clean", "build", "test", "quality"}
+	//}
+
 	for i := range p.steps {
-		if err := p.steps[i].Init(); err != nil {
+		if err := p.steps[i].Init(p); err != nil {
 			return errs.WithE(err, "Failed to init Step in project")
 		}
 	}
@@ -58,6 +83,7 @@ func (p *Project) Init() error {
 
 func (p Project) MustExecute() {
 	rootCommand := p.GetCommand()
+	rootCommand.SetArgs(p.args)
 	if err := rootCommand.Execute(); err != nil {
 		logs.WithE(err).Fatal("Command failed")
 	}
@@ -84,8 +110,8 @@ func (p Project) GetCommand() *cobra.Command {
 
 	cmd.PersistentFlags().StringVarP(&logLevel, "log-level", "L", "", "Set log level")
 
-	for _, command := range p.steps {
-		cmd.AddCommand(command.GetCommand())
+	for name := range p.steps {
+		cmd.AddCommand(p.MustGetCommand(name))
 	}
 
 	return cmd
@@ -113,5 +139,10 @@ func (p Builder) MustBuild() *Project {
 
 func (p Builder) WithStep(step Step) Builder {
 	p.steps[step.Name()] = step
+	return p
+}
+
+func (p Builder) WithArgs(args []string) Builder {
+	p.args = args
 	return p
 }

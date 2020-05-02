@@ -4,7 +4,7 @@ import "github.com/spf13/cobra"
 
 type Step interface {
 	Name() string
-	Init() error
+	Init(project *Project) error
 	GetCommand() *cobra.Command
 	//ensureRun()
 }

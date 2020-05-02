@@ -8,7 +8,7 @@ import (
 )
 
 type Client struct {
-	SocketPath string
+	SocketPath     string
 	SocketPassword string
 
 	conn *net.Conn

@@ -14,9 +14,12 @@ type StepCheck struct {
 	Misspell    *bool
 	Ineffassign *bool
 	Gocyclo     *bool
+
+	project *Project
 }
 
-func (c *StepCheck) Init() error {
+func (c *StepCheck) Init(project *Project) error {
+	c.project = project
 	return nil
 }
 
