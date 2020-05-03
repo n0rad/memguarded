@@ -1,2 +1,0 @@
-#!/bin/sh
-exec go run "$( cd "$(dirname "$0")" ; pwd -P )/hack" $@
