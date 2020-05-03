@@ -1,18 +1,24 @@
 package memguarded
 
 import (
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
 	"github.com/awnumar/memguard"
 	"github.com/n0rad/go-erlog/data"
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
 	"golang.org/x/sys/unix"
 	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/user"
+	"reflect"
 	"strconv"
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 type Server struct {
@@ -95,7 +101,27 @@ func (s *Server) Start() error {
 	s.cleanupSocket()
 	s.stop = make(chan struct{}, 1)
 
-	listener, err := net.Listen("unix", s.SocketPath)
+	cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
+	if err != nil {
+		return errs.WithE(err, "Failed to load server key")
+	}
+
+	certpool := x509.NewCertPool()
+	pem, err := ioutil.ReadFile("certs/ca.pem")
+	if err != nil {
+		return errs.WithE(err, "Failed to read client certificate authority")
+	}
+	if !certpool.AppendCertsFromPEM(pem) {
+		return errs.WithE(err, "failed to par client certificate authority")
+	}
+
+	config := tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    certpool,
+		Rand:         rand.Reader,
+	}
+	listener, err := tls.Listen("unix", s.SocketPath, &config)
 	if err != nil {
 		return errs.WithEF(err, data.WithField("path", s.SocketPath), "Failed to listen on socket")
 	}
@@ -163,11 +189,26 @@ func (s *Server) handleConnection(conn net.Conn) {
 }
 
 func (s *Server) handleConnectionE(conn net.Conn) error {
-	defer func() {
-		if err := conn.Close(); err != nil {
-			logs.WithE(err).Warn("Socket Connection closed with error")
+	defer conn.Close()
+
+	tlscon, ok := conn.(*tls.Conn)
+	if !ok {
+		return errs.With("Connection is not tls")
+	}
+
+	err := tlscon.Handshake()
+	if err != nil {
+		return errs.WithE(err, "TLS handshare failed")
+	}
+
+	state := tlscon.ConnectionState()
+	for _, v := range state.PeerCertificates {
+		key, err := x509.MarshalPKIXPublicKey(v.PublicKey)
+		if err != nil {
+			return errs.WithE(err, "failed to marshal public key")
 		}
-	}()
+		logs.WithF(data.WithField("key", key)).Debug("Client public key")
+	}
 
 	creds, err := getConnectionCredentials(conn)
 	if err != nil {
@@ -235,10 +276,36 @@ func WriteBytes(conn io.Writer, bytes []byte) error {
 	return nil
 }
 
-func getConnectionCredentials(c net.Conn) (*unix.Ucred, error) {
-	uc, ok := c.(*net.UnixConn)
+func unixConnFromTLSConn(conn tls.Conn) (*net.UnixConn, error) {
+	value := reflect.ValueOf(conn)
+	field := value.FieldByName("conn")
+
+	// Fails with "reflect.Value.UnsafeAddr of unaddressable value" because rs isn't addressable:
+	// field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+
+	valueCopy := reflect.New(value.Type()).Elem()
+	valueCopy.Set(value)
+	field = valueCopy.FieldByName("conn")
+	field = reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem()
+
+	i := field.Interface()
+	uc, ok := i.(*net.UnixConn)
 	if !ok {
-		return nil, errs.With("Not supported socket type")
+		return nil, errs.With("Failed to get unix connection from tls connection")
+	}
+	return uc, nil
+}
+
+func getConnectionCredentials(c net.Conn) (*unix.Ucred, error) {
+	var cred *unix.Ucred
+
+	tlscon, ok := c.(*tls.Conn)
+	if !ok {
+		return cred, errs.With("Connection is not tls")
+	}
+	uc, err := unixConnFromTLSConn(*tlscon)
+	if err != nil {
+		return nil, err
 	}
 
 	raw, err := uc.SyscallConn()
@@ -246,7 +313,6 @@ func getConnectionCredentials(c net.Conn) (*unix.Ucred, error) {
 		return nil, errs.WithE(err, "Failed to open raw connection")
 	}
 
-	var cred *unix.Ucred
 	err2 := raw.Control(func(fd uintptr) {
 		cred, err = unix.GetsockoptUcred(int(fd),
 			unix.SOL_SOCKET,
