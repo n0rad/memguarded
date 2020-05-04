@@ -1,4 +1,4 @@
-package main
+package memguarded
 
 import (
 	"github.com/n0rad/go-erlog/logs"

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"os"
-	"os/signal"
 	"sync"
 	"syscall"
 )
@@ -31,16 +30,8 @@ func (s *Service) Stop(e error) {
 }
 
 func (s *Service) Start() error {
-	term := make(chan os.Signal, 1)
-	signal.Notify(term, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-
-	select {
-	case <-term:
-	case <-s.stop:
-	}
-
-	logs.Debug("Purge memguard")
-	memguard.Purge()
+	memguard.CatchInterrupt()
+	<-s.stop
 	return nil
 }
 
@@ -97,7 +88,8 @@ func (s *Service) FromStdin(confirmation bool, name string) error {
 			s.setAndNotify(memguard.NewBufferFromBytes(secret))
 			return nil
 		} else {
-			fmt.Println("\nEmpty secret or do not match...\n")
+			fmt.Println("\nEmpty secret or do not match...")
+			fmt.Println()
 		}
 	}
 }

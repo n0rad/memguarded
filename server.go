@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/awnumar/memguard"
 	"github.com/n0rad/go-erlog/data"
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
@@ -22,65 +21,36 @@ import (
 )
 
 type Server struct {
-	Timeout                      time.Duration
-	SocketPath                   string
-	AnyClientErrorCloseTheServer bool
+	Timeout              time.Duration
+	SocketPath           string
+	StopOnAnyClientError bool
+	CertKey              string
+	CertPem              string
 
 	userUid  uint32
-	commands map[string]func(*metaConnection) error
+	commands map[string]func(net.Conn) error
 	stop     chan struct{}
 	listener net.Listener
 }
 
-type metaConnection struct {
-	conn    net.Conn
-	passSet bool
-}
-
-func (s *Server) Init(secretService *Service, socketPassword *Service) error {
+func (s *Server) Init(secretService *Service) error {
 	s.Timeout = 10 * time.Second
-	s.commands = make(map[string]func(*metaConnection) error)
+	s.commands = make(map[string]func(net.Conn) error)
 
-	s.commands["socket_password"] = func(m *metaConnection) error {
-		logs.Debug("Set socket password")
-		buffer, err := memguard.NewBufferFromReaderUntil(m.conn, '\n')
-		if err != nil {
-			return errs.WithE(err, "Failed to read socket secret from connection")
-		}
-
-		get, err := socketPassword.Get()
-		if err != nil {
-			return errs.WithE(err, "Failed to get current socket password")
-		}
-		if get.EqualTo(buffer.Bytes()) {
-			m.passSet = true
-		} else {
-			time.Sleep(5 * time.Second)
-			return errs.With("set wrong socket password")
-		}
-		return nil
-	}
-
-	s.commands["set_secret"] = func(m *metaConnection) error {
+	s.commands["set_secret"] = func(m net.Conn) error {
 		logs.Info("Set secret")
-		if !m.passSet {
-			return errs.With("socket secret not set, cannot perform command")
-		}
-		if err := secretService.FromConnection(m.conn); err != nil {
+		if err := secretService.FromConnection(m); err != nil {
 			return err
 		}
 		return nil
 	}
-	s.commands["get_secret"] = func(m *metaConnection) error {
+	s.commands["get_secret"] = func(m net.Conn) error {
 		logs.Info("Get secret")
-		if !m.passSet {
-			return errs.With("socket secret not set, cannot perform command")
-		}
-		err := secretService.Write(m.conn)
+		err := secretService.Write(m)
 		if err != nil {
 			return err
 		}
-		return WriteBytes(m.conn, []byte{'\n'})
+		return WriteBytes(m, []byte{'\n'})
 	}
 
 	uidStr, err := user.Current()
@@ -101,7 +71,7 @@ func (s *Server) Start() error {
 	s.cleanupSocket()
 	s.stop = make(chan struct{}, 1)
 
-	cert, err := tls.LoadX509KeyPair("certs/server.pem", "certs/server.key")
+	cert, err := tls.LoadX509KeyPair(s.CertPem, s.CertKey)
 	if err != nil {
 		return errs.WithE(err, "Failed to load server key")
 	}
@@ -121,6 +91,7 @@ func (s *Server) Start() error {
 		ClientCAs:    certpool,
 		Rand:         rand.Reader,
 	}
+
 	listener, err := tls.Listen("unix", s.SocketPath, &config)
 	if err != nil {
 		return errs.WithEF(err, data.WithField("path", s.SocketPath), "Failed to listen on socket")
@@ -183,7 +154,7 @@ func (s *Server) handleConnection(conn net.Conn) {
 		logs.WithE(err).Error("Client connection handle failed")
 	}
 
-	if err != nil && s.AnyClientErrorCloseTheServer {
+	if err != nil && s.StopOnAnyClientError {
 		s.Stop(err)
 	}
 }
@@ -219,8 +190,6 @@ func (s *Server) handleConnectionE(conn net.Conn) error {
 		return errs.WithEF(err, data.WithField("uid", creds.Uid), "Unauthorized access")
 	}
 
-	metaConn := &metaConnection{conn: conn}
-
 	for {
 		if err := conn.SetDeadline(time.Now().Add(s.Timeout)); err != nil {
 			return errs.WithE(err, "Failed to set deadline on socket connection")
@@ -239,7 +208,7 @@ func (s *Server) handleConnectionE(conn net.Conn) error {
 			return errs.WithEF(err, data.WithField("command", command), "Unknown command on socket")
 		}
 
-		if err := commandFunc(metaConn); err != nil {
+		if err := commandFunc(conn); err != nil {
 			return errs.WithE(err, "Client command failed")
 		}
 	}
