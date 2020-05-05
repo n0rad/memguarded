@@ -85,8 +85,8 @@ github.com/mitchellh/mapstructure v1.1.2/go.mod h1:FVVH3fgwuzCH5S8UJGiWEs2h04kUh
 github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223/go.mod h1:qRWi+5nqEBWmkhHvq77mSJWrCKwh8bxhgT7d/eI7P4U=
 github.com/n0rad/go-erlog v0.0.0-20190510152055-0a033e8086d8 h1:GruldGYGyaJtNT0hMMLkgW3WJjLmt00HXV7IVx8JFSM=
 github.com/n0rad/go-erlog v0.0.0-20190510152055-0a033e8086d8/go.mod h1:JKhdeq8dXTzwV13QQbMU9y8qmh1fnfPdxXnVPwpv6VA=
-github.com/n0rad/gomake v0.0.0-20200505120939-a26e9031fba5 h1:IVIQLmsMXril88SRWEASCSTpjni7EiIs+19aSaS+4ow=
-github.com/n0rad/gomake v0.0.0-20200505120939-a26e9031fba5/go.mod h1:glz4s8gKmBwtvqFD0j0K3vufoTKqf98UcgSW77IO9SM=
+github.com/n0rad/gomake v0.0.0-20200505213722-10ea3d981eef h1:mIbTWgu0D2CGu9TTvmOXNyQahdO2nL08yw8AIf79IAs=
+github.com/n0rad/gomake v0.0.0-20200505213722-10ea3d981eef/go.mod h1:glz4s8gKmBwtvqFD0j0K3vufoTKqf98UcgSW77IO9SM=
 github.com/oklog/run v1.1.0 h1:GEenZ1cK0+q0+wsJew9qUg/DyD8k3JzYsZAi5gYi2mA=
 github.com/oklog/run v1.1.0/go.mod h1:sVPdnTZT1zYwAJeCMu2Th4T21pA3FPOQRfWjQlk7DVU=
 github.com/oklog/ulid v1.3.1/go.mod h1:CirwcVhetQ6Lv90oh/F+FBtV6XMibvdAFo93nm5qn4U=
