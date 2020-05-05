@@ -16,5 +16,9 @@ func main() {
 				},
 			},
 		}).
+		WithStep(&gomake.StepRelease{
+			OsArchRelease: []string{"linux-amd64"},
+			Upx:           gomake.True,
+		}).
 		MustBuild().MustExecute()
 }
