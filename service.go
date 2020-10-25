@@ -41,7 +41,7 @@ func (s *Service) FromBytes(secret *[]byte) error {
 	return nil
 }
 
-func (s *Service) FromConnection(conn net.Conn) error {
+func (s *Service) FromReaderUntilNewLine(conn net.Conn) error {
 	buffer, err := memguard.NewBufferFromReaderUntil(conn, '\n')
 	if err != nil && err != io.EOF {
 		return errs.WithE(err, "Failed to read secret from connection")

@@ -86,7 +86,7 @@ func (c *Client) GetSecret(secretService *Service) error {
 		return errs.WithE(err, "Failed to write command")
 	}
 
-	if err := secretService.FromConnection(c.conn); err != nil {
+	if err := secretService.FromReaderUntilNewLine(c.conn); err != nil {
 		return errs.WithE(err, "Failed to get secret")
 	}
 	return nil

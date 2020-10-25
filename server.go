@@ -39,7 +39,7 @@ func (s *Server) Init(secretService *Service) error {
 
 	s.commands["set_secret"] = func(m net.Conn) error {
 		logs.Info("Set secret")
-		if err := secretService.FromConnection(m); err != nil {
+		if err := secretService.FromReaderUntilNewLine(m); err != nil {
 			return err
 		}
 		return nil

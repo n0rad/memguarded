@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 # call this script with an email address (valid or not).
 # like:
 # ./makecert.sh foo@foo.com
