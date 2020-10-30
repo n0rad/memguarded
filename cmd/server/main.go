@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
 	_ "github.com/n0rad/go-erlog/register"
 	"github.com/n0rad/memguarded"
@@ -30,6 +31,11 @@ func execute() error {
 		ServerPem:            "/etc/" + app + "/" + app + ".pem",
 	}
 
+	if err := config.Secret.AskSecret(true, "Secret"); err != nil {
+		return errs.WithE(err, "Failed ask secret")
+	}
+
 	logs.Info("Start")
+
 	return memguarded.StartServer(config)
 }
