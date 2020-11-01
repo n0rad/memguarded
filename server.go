@@ -26,7 +26,7 @@ type Server struct {
 	StopOnAnyClientError bool
 	CertKey              string
 	CertPem              string
-	CAPem				 string
+	CAPem                string
 
 	userUid  uint32
 	commands map[string]func(net.Conn) error

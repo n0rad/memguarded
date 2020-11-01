@@ -40,7 +40,7 @@ func StartServer(config CliConfig) error {
 	socketServer := Server{
 		CertKey:              config.ServerKey,
 		CertPem:              config.ServerPem,
-		CAPem: 				  config.CaPem,
+		CAPem:                config.CaPem,
 		SocketPath:           config.SocketPath,
 		StopOnAnyClientError: config.StopOnAnyClientError,
 	}
