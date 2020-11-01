@@ -14,6 +14,7 @@ type CliConfig struct {
 	ClientPem      string
 	ServerKey      string
 	ServerPem      string
+	CaPem          string
 
 	// server only
 	StopOnAnyClientError bool
@@ -39,6 +40,7 @@ func StartServer(config CliConfig) error {
 	socketServer := Server{
 		CertKey:              config.ServerKey,
 		CertPem:              config.ServerPem,
+		CAPem: 				  config.CaPem,
 		SocketPath:           config.SocketPath,
 		StopOnAnyClientError: config.StopOnAnyClientError,
 	}

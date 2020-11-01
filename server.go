@@ -26,6 +26,7 @@ type Server struct {
 	StopOnAnyClientError bool
 	CertKey              string
 	CertPem              string
+	CAPem				 string
 
 	userUid  uint32
 	commands map[string]func(net.Conn) error
@@ -77,12 +78,12 @@ func (s *Server) Start() error {
 	}
 
 	certpool := x509.NewCertPool()
-	pem, err := ioutil.ReadFile("certs/ca.pem")
+	pem, err := ioutil.ReadFile(s.CAPem)
 	if err != nil {
-		return errs.WithE(err, "Failed to read client certificate authority")
+		return errs.WithE(err, "Failed to read client CA certificate authority")
 	}
 	if !certpool.AppendCertsFromPEM(pem) {
-		return errs.WithE(err, "failed to par client certificate authority")
+		return errs.WithE(err, "failed to parse client CA certificate authority")
 	}
 
 	config := tls.Config{

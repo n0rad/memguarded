@@ -37,6 +37,7 @@ func execute() error {
 	clientPem := flags.String("client-pem", "certs/client.pem", "client pem")
 	serverKey := flags.String("server-key", "certs/server.key", "server key")
 	serverPem := flags.String("server-pem", "certs/server.pem", "server pem")
+	caPem := flags.String("ca-pem", "certs/ca.pem", "ca pem")
 	debug := flags.Bool("debug", false, "debug")
 	continueOnError := flags.Bool("continue-on-error", false, "Do not stop the server on any error")
 
@@ -69,6 +70,7 @@ func execute() error {
 		ClientPem:            *clientPem,
 		ServerKey:            *serverKey,
 		ServerPem:            *serverPem,
+		CaPem: 				  *caPem,
 	}
 
 	switch os.Args[1] {
