@@ -16,4 +16,5 @@ The **memguarded** binary can :
 - run `get` to get the secret from the server
 
 
-_The code is designed to be sure the password (and the socket password) do not live in memory elsewhere than in memguard_
+**The code is designed to be sure the password (and the socket password) do not live in memory elsewhere than in memguard, client side and server side.
+From the terminal prompt on the client side to memguarded on server side and from the server back to a client locked buffer**
