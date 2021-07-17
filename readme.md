@@ -13,7 +13,7 @@ The client and server code can be used **as libraries** to be integrated in othe
 Security support with :
 - unix socket file permission set to current user only
 - Check SO_PEERCRED matches current server user
-- Client cert check
+- Client/Server cert check
 - Socket password
 
 _The code is designed to be sure the password (and the socket password) do not live in memory elsewhere than in memguard_
