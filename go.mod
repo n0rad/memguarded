@@ -12,9 +12,8 @@ require (
 	github.com/n0rad/gomake v0.0.0-20201101000806-0fba72c4e831
 	github.com/oklog/run v1.1.0
 	github.com/spf13/cobra v1.1.1 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20200403053413-436114b17e7c
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
-	golang.org/x/sys v0.0.0-20201029080932-201ba4db2418
+	golang.org/x/sys v0.1.0
 	golang.org/x/tools v0.0.0-20201031021630-582c62ec74d0 // indirect
 )
