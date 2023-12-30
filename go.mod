@@ -13,6 +13,6 @@ require (
 	github.com/oklog/run v1.1.0
 	github.com/spf13/cobra v1.1.1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20200403053413-436114b17e7c
-	golang.org/x/crypto v0.1.0
-	golang.org/x/sys v0.1.0
+	golang.org/x/crypto v0.17.0
+	golang.org/x/sys v0.15.0
 )
