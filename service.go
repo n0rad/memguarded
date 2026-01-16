@@ -2,15 +2,16 @@ package memguarded
 
 import (
 	"fmt"
-	"github.com/awnumar/memguard"
-	"github.com/n0rad/go-erlog/errs"
-	"github.com/n0rad/go-erlog/logs"
-	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"net"
 	"os"
 	"sync"
 	"syscall"
+
+	"github.com/awnumar/memguard"
+	"github.com/n0rad/go-erlog/errs"
+	"github.com/n0rad/go-erlog/logs"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 type Service struct {
@@ -18,6 +19,12 @@ type Service struct {
 	notify     map[chan struct{}]struct{}
 	notifyLock sync.RWMutex
 	stop       chan struct{}
+}
+
+func NewService() *Service {
+	s := &Service{}
+	s.Init()
+	return s
 }
 
 func (s *Service) Init() {
@@ -133,6 +140,53 @@ func (s Service) Write(writer io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func (s Service) Reader() io.Reader {
+	if s.secret == nil {
+		return nil
+	}
+	return &secretReader{enclave: s.secret}
+}
+
+type secretReader struct {
+	enclave *memguard.Enclave
+	pos     int
+	closed  bool
+}
+
+func (r *secretReader) Read(p []byte) (int, error) {
+	if r.closed {
+		return 0, io.EOF
+	}
+	if r.enclave == nil {
+		r.closed = true
+		return 0, errs.With("No enclave to open")
+	}
+
+	if r.pos >= r.enclave.Size() {
+		// We've already read everything.
+		r.closed = true
+		return 0, io.EOF
+	}
+
+	buf, err := r.enclave.Open()
+	if err != nil {
+		r.closed = true
+		return 0, errs.WithE(err, "Failed to open secret enclave")
+	}
+	defer buf.Destroy()
+
+	b := buf.Bytes()
+	n := copy(p, b[r.pos:])
+	r.pos += n
+
+	if r.pos >= len(b) {
+		// Mark as closed after final chunk.
+		r.closed = true
+	}
+
+	return n, nil
 }
 
 func (s Service) IsSet() bool {
