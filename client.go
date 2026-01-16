@@ -3,12 +3,13 @@ package memguarded
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/n0rad/go-erlog/data"
-	"github.com/n0rad/go-erlog/errs"
-	"github.com/n0rad/go-erlog/logs"
 	"log"
 	"net"
 	"time"
+
+	"github.com/n0rad/go-erlog/data"
+	"github.com/n0rad/go-erlog/errs"
+	"github.com/n0rad/go-erlog/logs"
 )
 
 type Client struct {

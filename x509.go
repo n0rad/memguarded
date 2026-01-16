@@ -8,10 +8,11 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"github.com/n0rad/go-erlog/errs"
-	"github.com/youmark/pkcs8"
 	"io/ioutil"
 	"strings"
+
+	"github.com/n0rad/go-erlog/errs"
+	"github.com/youmark/pkcs8"
 )
 
 func loadX509KeyPair(certFile, keyFile string, certPassphrase *Service) (cert tls.Certificate, err error) {

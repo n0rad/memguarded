@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/n0rad/go-erlog/errs"
-	"github.com/n0rad/go-erlog/logs"
-	_ "github.com/n0rad/go-erlog/register"
-	"github.com/n0rad/memguarded"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/n0rad/go-erlog/errs"
+	"github.com/n0rad/go-erlog/logs"
+	_ "github.com/n0rad/go-erlog/register"
+	"github.com/n0rad/memguarded"
 )
 
 // very simple daemon example server
