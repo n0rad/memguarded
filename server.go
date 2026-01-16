@@ -4,10 +4,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/n0rad/go-erlog/data"
-	"github.com/n0rad/go-erlog/errs"
-	"github.com/n0rad/go-erlog/logs"
-	"golang.org/x/sys/unix"
 	"io"
 	"io/ioutil"
 	"net"
@@ -18,6 +14,11 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"github.com/n0rad/go-erlog/data"
+	"github.com/n0rad/go-erlog/errs"
+	"github.com/n0rad/go-erlog/logs"
+	"golang.org/x/sys/unix"
 )
 
 type Server struct {

@@ -1,3 +1,5 @@
+//go:build build
+
 package main
 
 import "github.com/n0rad/gomake"
@@ -8,11 +10,11 @@ func main() {
 			Programs: []gomake.Program{
 				{
 					BinaryName: "memguarded-server",
-					Package:    "./cmd/server",
+					Package:    "./pkg/cmd/server",
 				},
 				{
 					BinaryName: "memguarded",
-					Package:    "./cmd/cli",
+					Package:    "./pkg/cmd/cli",
 				},
 			},
 		}).

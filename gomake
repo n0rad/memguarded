@@ -1,2 +1,3 @@
 #!/bin/sh
-exec go run "$( cd "$(dirname "$0")" ; pwd -P )/hack" $@
+cd "$( cd "$(dirname "$0")" ; pwd)"
+exec go run -tags='build' ./pkg/build "$@"

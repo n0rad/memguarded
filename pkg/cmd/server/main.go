@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/n0rad/go-erlog/errs"
-	"github.com/n0rad/go-erlog/logs"
-	_ "github.com/n0rad/go-erlog/register"
-	"github.com/n0rad/memguarded"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/n0rad/go-erlog/errs"
+	"github.com/n0rad/go-erlog/logs"
+	_ "github.com/n0rad/go-erlog/register"
+	"github.com/n0rad/memguarded"
 )
 
 // very simple daemon example server
@@ -29,7 +30,7 @@ func execute() error {
 		SocketPath:           "/etc/" + app + "/" + app + ".sock",
 		ServerKey:            "/etc/" + app + "/" + app + ".key",
 		ServerPem:            "/etc/" + app + "/" + app + ".pem",
-		CaPem: 				  "/etc/" + app + "/ca.pem",
+		CaPem:                "/etc/" + app + "/ca.pem",
 	}
 
 	if err := config.Secret.AskSecret(true, "Secret"); err != nil {

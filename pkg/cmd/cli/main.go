@@ -3,15 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
+	"os"
+	"path/filepath"
+	"time"
+
 	"github.com/n0rad/go-erlog/data"
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
 	_ "github.com/n0rad/go-erlog/register"
 	"github.com/n0rad/memguarded"
-	"math/rand"
-	"os"
-	"path/filepath"
-	"time"
 )
 
 var Version = ""
@@ -70,7 +71,7 @@ func execute() error {
 		ClientPem:            *clientPem,
 		ServerKey:            *serverKey,
 		ServerPem:            *serverPem,
-		CaPem: 				  *caPem,
+		CaPem:                *caPem,
 	}
 
 	switch os.Args[1] {

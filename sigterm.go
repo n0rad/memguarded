@@ -1,10 +1,11 @@
 package memguarded
 
 import (
-	"github.com/n0rad/go-erlog/logs"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/n0rad/go-erlog/logs"
 )
 
 type SigtermService struct {

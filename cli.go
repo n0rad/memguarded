@@ -1,9 +1,10 @@
 package memguarded
 
 import (
+	"os"
+
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/oklog/run"
-	"os"
 )
 
 type CliConfig struct {
