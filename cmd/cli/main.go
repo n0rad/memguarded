@@ -70,7 +70,7 @@ func execute() error {
 		ClientPem:            *clientPem,
 		ServerKey:            *serverKey,
 		ServerPem:            *serverPem,
-		CaPem: 				  *caPem,
+		CaPem:                *caPem,
 	}
 
 	switch os.Args[1] {

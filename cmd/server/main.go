@@ -29,7 +29,7 @@ func execute() error {
 		SocketPath:           "/etc/" + app + "/" + app + ".sock",
 		ServerKey:            "/etc/" + app + "/" + app + ".key",
 		ServerPem:            "/etc/" + app + "/" + app + ".pem",
-		CaPem: 				  "/etc/" + app + "/ca.pem",
+		CaPem:                "/etc/" + app + "/ca.pem",
 	}
 
 	if err := config.Secret.AskSecret(true, "Secret"); err != nil {
