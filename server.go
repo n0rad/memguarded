@@ -18,7 +18,6 @@ import (
 	"github.com/n0rad/go-erlog/data"
 	"github.com/n0rad/go-erlog/errs"
 	"github.com/n0rad/go-erlog/logs"
-	"golang.org/x/sys/unix"
 )
 
 type Server struct {
@@ -188,7 +187,7 @@ func (s *Server) handleConnectionE(conn net.Conn) error {
 		return errs.WithE(err, "Failed to read client credentials")
 	}
 
-	if creds.Uid != s.userUid {
+	if creds != nil && creds.Uid != s.userUid {
 		return errs.WithEF(err, data.WithField("uid", creds.Uid), "Unauthorized access")
 	}
 
@@ -265,38 +264,4 @@ func unixConnFromTLSConn(conn tls.Conn) (*net.UnixConn, error) {
 		return nil, errs.With("Failed to get unix connection from tls connection")
 	}
 	return uc, nil
-}
-
-func getConnectionCredentials(c net.Conn) (*unix.Ucred, error) {
-	var cred *unix.Ucred
-
-	tlscon, ok := c.(*tls.Conn)
-	if !ok {
-		return cred, errs.With("Connection is not tls")
-	}
-	uc, err := unixConnFromTLSConn(*tlscon)
-	if err != nil {
-		return nil, err
-	}
-
-	raw, err := uc.SyscallConn()
-	if err != nil {
-		return nil, errs.WithE(err, "Failed to open raw connection")
-	}
-
-	err2 := raw.Control(func(fd uintptr) {
-		cred, err = unix.GetsockoptUcred(int(fd),
-			unix.SOL_SOCKET,
-			unix.SO_PEERCRED)
-	})
-
-	if err != nil {
-		return nil, errs.WithE(err, "Failed to user credentials from socket control")
-	}
-
-	if err2 != nil {
-		return nil, errs.WithE(err2, "Failed to user credentials from socket control")
-	}
-
-	return cred, nil
 }
